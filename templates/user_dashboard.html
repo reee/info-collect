@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mt-5 mb-4">班级学生管理面板</h2>
+    <p>当前班级代码: {{ current_user.username }} | <a href="{{ url_for('add_student') }}">添加学生</a></p>
+    <p><strong>温馨提示：</strong>上传照片的要求为：白底，无逆光，露出额头及耳朵，人脸正面免冠近期大头照。(参考登记照要求)</p>
+    <hr>
+    <h3>已录入学生名单</h3>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>姓名</th>
+                <th>班级</th>
+                <th>班级内部编号</th>
+                <th>中午离校</th>
+                <th>晚上离校</th>
+                <th>校内走读</th>
+                <th>住校</th>
+                <th>备注</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for student in student_entries %}
+            <tr>
+                <td>{{ student.name }}</td>
+                <td>{{ student.class_name }}</td>
+                <td>{{ student.internal_id }}</td>
+                <td>{{ "是" if student.noon_leaving else "否" }}</td>
+                <td>{{ "是" if student.night_leaving else "否" }}</td>
+                <td>{{ "是" if student.day_student else "否" }}</td>
+                <td>{{ "是" if student.boarding_student else "否" }}</td>
+                <td>{{ student.remarks }}</td>
+                <td>
+                    <form method="POST" action="{{ url_for('delete_student', student_id=student.id) }}" onsubmit="return confirm('确定要删除该学生吗？');">
+                        <input type="hidden" name="_method" value="DELETE">
+                        <button type="submit" class="btn btn-danger btn-sm">删除</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

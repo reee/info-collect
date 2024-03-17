@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% from 'bootstrap5/form.html' import render_form %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mt-5 mb-4">管理员控制面板</h2>
+    <p><a href="{{ url_for('export_students') }}">导出所有学生</a> | <a href="{{ url_for('export_student_photos') }}">导出所有学生照片</a></p>
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">导入用户信息</h5>
+            {{ render_form(form) }}
+        </div>
+    </div>
+</div>
+{% endblock %}

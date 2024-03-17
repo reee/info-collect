@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>涪陵五中人脸信息采集系统</title>
+    {{ bootstrap.load_css() }}
+</head>
+<body>
+  <div class="container">
+    <nav class="navbar navbar-expand-lg bg-body-tertiary">
+      <div class="container-fluid">
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavAltMarkup" aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
+          <div class="navbar-nav">
+            <a class="nav-link active" aria-current="page" href="/">主页</a>
+            {% if current_user.is_anonymous %}
+            <a class="nav-item nav-link" href="/">登录</a>
+            {% else %}
+            <a class="nav-item nav-link" href="/user">班级管理面板</a>
+            <a class="nav-item nav-link" href="/logout">注销</a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </nav>
+  </div>
+
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+              {% if category == 'message' %}
+                <div class="alert alert-warning alert-dismissible" role="alert">
+              {% else %}
+                <div class="alert alert-{{ category }} alert-dismissible" role="alert">
+              {% endif %}
+                {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+          {% endfor %}
+        {% endif %}
+    {% endwith %}
+  </div>
+
+  <div class="container mt-5">
+      {% block content %}{% endblock %}
+  </div>
+  
+  {{ bootstrap.load_js() }}
+</body>
+</html>
