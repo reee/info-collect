@@ -1,46 +1,104 @@
 {% extends "base.html" %}
-
 {% block content %}
+
 <div class="container">
-    <h2 class="mt-5 mb-4">班级学生管理面板</h2>
-    <p>当前班级代码: {{ current_user.username }} | <a href="{{ url_for('add_student') }}">添加学生</a></p>
-    <p><strong>温馨提示：</strong>上传照片的要求为：白底，无逆光，露出额头及耳朵，人脸正面免冠近期大头照。(参考登记照要求)</p>
+    <h2 id="班级学生管理面板" class="mt-5 mb-4">班级学生管理面板</h2>
+
+    <p>当前班级代码: {{ current_user.username }} <a href="{{ url_for('add_student') }}" class="btn btn-primary" role="button">新增学生信息</a></p>
+
+    <h4>温馨提示：</h4>
+    <ol>
+        <li>上传照片的要求为：<strong>无任何PS或者美颜的近期自拍大头照，要求露出额头及耳朵，白色或浅色背景，无逆光。</strong></li>
+        <li>信息填写不准确的请删除后重新新增即可。</li>
+    </ol>
     <hr>
     <h3>已录入学生名单</h3>
-    <table class="table table-striped">
-        <thead>
-            <tr>
-                <th>姓名</th>
-                <th>班级</th>
-                <th>班级内部编号</th>
-                <th>中午离校</th>
-                <th>晚上离校</th>
-                <th>校内走读</th>
-                <th>住校</th>
-                <th>备注</th>
-                <th>操作</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for student in student_entries %}
-            <tr>
-                <td>{{ student.name }}</td>
-                <td>{{ student.class_name }}</td>
-                <td>{{ student.internal_id }}</td>
-                <td>{{ "是" if student.noon_leaving else "否" }}</td>
-                <td>{{ "是" if student.night_leaving else "否" }}</td>
-                <td>{{ "是" if student.day_student else "否" }}</td>
-                <td>{{ "是" if student.boarding_student else "否" }}</td>
-                <td>{{ student.remarks }}</td>
-                <td>
-                    <form method="POST" action="{{ url_for('delete_student', student_id=student.id) }}" onsubmit="return confirm('确定要删除该学生吗？');">
-                        <input type="hidden" name="_method" value="DELETE">
-                        <button type="submit" class="btn btn-danger btn-sm">删除</button>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <div class="table-responsive-sm">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>序号</th>
+                    <th>姓名</th>
+                    <th>性别</th>
+                    <th>照片</th>
+                    <th>班级</th>
+                    <th>班级内部编号</th>
+                    <th>中午离校</th>
+                    <th>晚上离校</th>
+                    <th>校内走读</th>
+                    <th>住校</th>
+                    <th>备注</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student in student_entries|sort(attribute='name') %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ student.name }}</td>
+                    <td>{{ student.gender }}</td>
+                    <td>
+                        {% if student.photo_filename %}
+                        <img src="{{ url_for('uploaded_file', filename=student.photo_filename) }}"
+                             alt="{{ student.name }}的照片"
+                             class="img-thumbnail"
+                             style="width: 120px; height: 120px; object-fit: cover; cursor: pointer;"
+                             data-bs-toggle="modal"
+                             data-bs-target="#imageModal"
+                             data-bs-src="{{ url_for('uploaded_file', filename=student.photo_filename) }}"
+                             data-bs-name="{{ student.name }}">
+                        {% else %}
+                        无照片
+                        {% endif %}
+                    </td>
+                    <td>{{ student.class_name }}</td>
+                    <td>{{ student.internal_id }}</td>
+                    <td>{{ "是" if student.noon_leaving else "否" }}</td>
+                    <td>{{ "是" if student.night_leaving else "否" }}</td>
+                    <td>{{ "是" if student.day_student else "否" }}</td>
+                    <td>{{ "是" if student.boarding_student else "否" }}</td>
+                    <td>{{ student.remarks }}</td>
+                    <td>
+                        <button class="btn btn-danger btn-sm">删除</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="modal fade" id="imageModal" tabindex="-1" role="dialog" aria-labelledby="imageModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="imageModalLabel"></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img id="modalImage" class="img-fluid" style="max-height: 80vh; width: auto;" alt="学生照片">
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var imageModal = document.getElementById('imageModal');
+        imageModal.addEventListener('show.bs.modal', function (event) {
+            var button = event.relatedTarget;
+            var imgSrc = button.getAttribute('data-bs-src');
+            var studentName = button.getAttribute('data-bs-name');
+            var modalImage = document.getElementById('modalImage');
+            var modalTitle = imageModal.querySelector('.modal-title');
+            
+            modalImage.src = imgSrc;
+            modalTitle.textContent = studentName + '的照片';
+        });
+    });
+</script>
 {% endblock %}

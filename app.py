@@ -1,7 +1,12 @@
-from flask import Flask, render_template, redirect, send_file, url_for, request, flash
+from collections import defaultdict
+import re
+from flask import Flask, current_app, render_template, redirect, send_file, send_from_directory, url_for, request, flash
 from flask_login import LoginManager, login_user, logout_user, current_user
 from flask_bootstrap import Bootstrap5
 from flask_migrate import Migrate
+from sqlalchemy import func
+from sqlalchemy.exc import SQLAlchemyError
+
 
 from forms import LoginForm, ImportForm, StudentForm
 from models import db, User, Student
@@ -88,8 +93,15 @@ def admin_dashboard():
     form = ImportForm()
     if form.validate_on_submit():
         file = form.file.data
+        clear_users = form.clear_users.data
         if file.filename.endswith('.xlsx'):
             try:
+                if clear_users:
+                    # 删除所有现有用户
+                    User.query.delete()
+                    db.session.commit()
+                    flash('所有现有用户已被删除', 'info')
+
                 df = pd.read_excel(file)
                 for _, row in df.iterrows():
                     username = row['用户名']
@@ -100,10 +112,46 @@ def admin_dashboard():
                 db.session.commit()
                 flash('用户信息导入成功', 'success')
             except Exception as e:
+                db.session.rollback()
                 flash(f'导入失败：{str(e)}', 'danger')
         else:
             flash('仅支持导入.xlsx文件', 'danger')
-    return render_template('admin_dashboard.html', form=form)
+
+    # 获取所有用户并分组
+    users = User.query.all()
+    grouped_users = defaultdict(list)
+
+    if users:
+        # 获取每个班级的学生人数
+        student_counts = dict(db.session.query(Student.class_name, func.count(Student.id))
+                              .group_by(Student.class_name).all())
+
+        for user in users:
+            # 为用户添加学生人数属性
+            user.student_count = student_counts.get(user.username, 0)
+
+            if user.username.startswith(('GZJD', 'CZJD')):
+                grouped_users['创新基地班组'].append(user)
+            elif user.username.startswith('GZ'):
+                match = re.match(r'GZ(\d{4})', user.username)
+                if match:
+                    year = match.group(1)
+                    grouped_users[f'高中{year}届'].append(user)
+                else:
+                    grouped_users['其他高中'].append(user)
+            elif user.username.startswith('CZ'):
+                match = re.match(r'CZ(\d{4})', user.username)
+                if match:
+                    year = match.group(1)
+                    grouped_users[f'初中{year}届'].append(user)
+                else:
+                    grouped_users['其他初中'].append(user)
+            else:
+                grouped_users['其他'].append(user)
+    else:
+        flash('当前没有用户数据，请先导入用户。', 'info')
+
+    return render_template('admin_dashboard.html', form=form, grouped_users=grouped_users)
 
 @app.route('/user')
 def user_dashboard():
@@ -111,6 +159,10 @@ def user_dashboard():
         return redirect(url_for('login'))
     student_entries = Student.query.filter_by(class_name=current_user.username).all()
     return render_template('user_dashboard.html', current_user=current_user, student_entries=student_entries)
+
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 @app.route('/add_student', methods=['GET', 'POST'])
 def add_student():
@@ -139,15 +191,37 @@ def add_student():
 
             # 对本班级的所有学生进行排序编号
             students = Student.query.filter_by(class_name=current_user.username).order_by(Student.name).all()
-            for idx, student in enumerate(students, start=1):
-                # 初中部分逻辑尚未实现
-                if current_user.username.startswith('G'):
-                    internal_id = current_user.username[1:] + '{:02d}'.format(idx)
-                    student.internal_id = internal_id
-                db.session.commit()
+            for student in students:
+                student.internal_id = None
+                db.session.commit()  # 提交清空操作
 
-            flash('学生信息添加成功', 'success')
-            return redirect(url_for('user_dashboard'))
+            prefix_map = {
+                'GZJD': '30',
+                'CZJD': '40',
+                'GZ': '20',
+                'CZ': '10'
+            }
+
+            try:
+                for idx, student in enumerate(students, start=1):
+                    for prefix, num in prefix_map.items():
+                        if current_user.username.startswith(prefix):
+                            slice_index = len(prefix) + 2
+                            internal_id = f"{num}{current_user.username[slice_index:]}{idx:02d}"
+                            student.internal_id = str(internal_id)
+                            #current_app.logger.info(f"Student {student.name} assigned internal_id: {internal_id}")
+                            break
+                
+                db.session.commit()
+                flash('学生信息添加成功', 'success')
+                return redirect(url_for('user_dashboard'))
+
+            except SQLAlchemyError as e:
+                db.session.rollback()
+                flash('数据库操作失败，请稍后重试', 'error')
+                # 可以添加日志记录
+                current_app.logger.error(f"Database error: {str(e)}")
+                return redirect(url_for('error_page'))
         else:
         # 如果表单验证失败，显示错误消息并返回到表单页面
             for field, errors in form.errors.items():
@@ -180,17 +254,32 @@ def delete_student(student_id):
     flash('学生信息删除成功', 'success')
     return redirect(url_for('user_dashboard'))
 
-@app.route('/export_students', methods=['GET'])
-def export_students():
-    students = Student.query.all()
+@app.route('/export_class_students/<username>/<boarding_or_leaving>', methods=['GET'])
+def export_class_students(username, boarding_or_leaving):
+    if boarding_or_leaving == 'True':
+        students = Student.query.filter_by(class_name=username, boarding_student=True).all()
+        file_suffix = '住校'
+    elif boarding_or_leaving == 'False':
+        students = Student.query.filter_by(class_name=username, boarding_student=False).all()
+        file_suffix = '非住校'
+    elif boarding_or_leaving == 'leaving':
+        students = Student.query.filter_by(class_name=username, noon_leaving=True, night_leaving=True).all()
+        file_suffix = '中午晚上离校'
+    else:
+        flash('无效的导出选项', 'error')
+        return redirect(url_for('admin_dashboard'))
     
+    if not students:
+        flash(f'没有找到 {username} 班级的{file_suffix}学生。', 'info')
+        return redirect(url_for('admin_dashboard'))
+
     # 创建一个工作簿
     wb = Workbook()
     ws = wb.active
     ws.title = "学生信息"
     
     # 添加表头
-    ws.append(["班级", "姓名", "内部编号", "中午出校", "晚上出校", "校内走读", "住校", "备注"])
+    ws.append(["班级", "姓名", "内部编号", "性别", "中午出校", "晚上出校", "校内走读", "住校", "备注"])
     
     # 添加学生信息
     for student in students:
@@ -198,6 +287,7 @@ def export_students():
             student.class_name,
             student.name,
             student.internal_id,
+            student.gender,
             "是" if student.noon_leaving else "否",
             "是" if student.night_leaving else "否",
             "是" if student.day_student else "否",
@@ -205,34 +295,30 @@ def export_students():
             student.remarks
         ])
     
-    # 保存文件
-    filename = "students.xlsx"
-    wb.save(filename)
-    
-    # 提供文件下载
-    return send_file(filename, as_attachment=True)
+    # 保存Excel文件
+    excel_buffer = io.BytesIO()
+    wb.save(excel_buffer)
+    excel_buffer.seek(0)
 
-@app.route('/export_student_photos', methods=['GET'])
-def export_student_photos():
-    students = Student.query.all()
-    
-    # 创建一个内存缓冲区来保存 zip 文件
+    # 创建一个zip文件并添加Excel文件
     zip_buffer = io.BytesIO()
-    
-    # 创建一个 zip 压缩包
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zipf:
-        # 将学生照片添加到 zip 压缩包中
+        zipf.writestr("students_list.xlsx", excel_buffer.getvalue())
+
+        # 添加学生照片
         for student in students:
             if student.photo_filename:
                 photo_path = os.path.join(app.config['UPLOAD_FOLDER'], student.photo_filename)
-                photo_name = f"{student.name}_{student.internal_id}.jpg"  # 学生姓名+内部编号作为照片名称
-                # 将照片文件内容直接写入到 zip 压缩包中
+                photo_name = f"{student.name}_{student.internal_id}.jpg"
                 with open(photo_path, 'rb') as photo_file:
                     zipf.writestr(photo_name, photo_file.read())
-    
-    # 将内存缓冲区的内容作为文件发送给用户以供下载
+
     zip_buffer.seek(0)
-    return send_file(zip_buffer, as_attachment=True, download_name='student_photos.zip')
+    return send_file(
+        zip_buffer,
+        as_attachment=True,
+        download_name=f"{username}_{file_suffix}_students.zip"
+    )
 
 if __name__ == '__main__':
     with app.app_context():

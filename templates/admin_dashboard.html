@@ -1,15 +1,41 @@
 {% extends "base.html" %}
 {% from 'bootstrap5/form.html' import render_form %}
-
 {% block content %}
+
 <div class="container">
     <h2 class="mt-5 mb-4">管理员控制面板</h2>
-    <p><a href="{{ url_for('export_students') }}">导出所有学生</a> | <a href="{{ url_for('export_student_photos') }}">导出所有学生照片</a></p>
-    <div class="card">
+
+    <div class="card mt-4">
         <div class="card-body">
             <h5 class="card-title">导入用户信息</h5>
             {{ render_form(form) }}
         </div>
     </div>
+
+    <h3 class="mt-5">班级列表</h3>
+
+    {% if grouped_users %}
+        {% for group, users in grouped_users.items() %}
+            <h4 class="mt-4">{{ group }}</h4>
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                {% for user in users %}
+                    <div class="col">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ user.username }}</h5>
+                                <p>已录入学生人数：{{ user.student_count }}</p>
+                                <a href="{{ url_for('export_class_students', username=user.username, boarding_or_leaving='True') }}" class="btn btn-sm btn-primary my-1">导出住校生</a>
+                                <a href="{{ url_for('export_class_students', username=user.username, boarding_or_leaving='False') }}" class="btn btn-sm btn-secondary my-1">导出非住校生</a>
+                                <a href="{{ url_for('export_class_students', username=user.username, boarding_or_leaving='leaving') }}" class="btn btn-sm btn-info my-1">导出中午晚上离校生</a>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endfor %}
+    {% else %}
+        <p>当前没有用户数据，请先导入用户。</p>
+    {% endif %}
 </div>
+
 {% endblock %}

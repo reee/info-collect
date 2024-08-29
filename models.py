@@ -6,8 +6,9 @@ db = SQLAlchemy()
 
 class Student(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    internal_id = db.Column(db.Integer, unique=True)
+    internal_id = db.Column(db.String(10), unique=True)
     name = db.Column(db.String(100), nullable=False)
+    gender = db.Column(db.String(10), nullable=False)
     class_name = db.Column(db.String(100), nullable=False)
     noon_leaving = db.Column(db.Boolean, nullable=False)
     night_leaving = db.Column(db.Boolean, nullable=False)

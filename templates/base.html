@@ -49,6 +49,10 @@
       {% block content %}{% endblock %}
   </div>
   
-  {{ bootstrap.load_js() }}
+  {% block scripts %}
+    {{ bootstrap.load_js() }}
+  {% endblock %}
+
+
 </body>
 </html>

@@ -161,3 +161,4 @@ cython_debug/
 
 # Admin Define file
 admin_config.json
+uploads/
