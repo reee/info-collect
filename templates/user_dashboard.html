@@ -8,7 +8,7 @@
 
     <h4>温馨提示：</h4>
     <ol>
-        <li>上传照片的要求为：<strong>无任何PS或者美颜的近期自拍大头照，要求露出额头及耳朵，白色或浅色背景，无逆光。</strong></li>
+        <li>上传照片的要求为：<strong>当天拍摄的（可用自己手机拍摄）无任何PS或者美颜的大头照，要求露出额头及耳朵，白色或浅色背景，无逆光。</strong></li>
         <li>信息填写不准确的请删除后重新新增即可。</li>
     </ol>
     <hr>
@@ -59,8 +59,11 @@
                     <td>{{ "是" if student.boarding_student else "否" }}</td>
                     <td>{{ student.remarks }}</td>
                     <td>
-                        <button class="btn btn-danger btn-sm">删除</button>
-                    </td>
+			    <form method="POST" action="{{url_for('delete_student',student_id=student.id)}}" onsubmit="return confirm('确定删除该学生吗？');">
+				    <input type="hidden" name="_method" value="DELETE">
+				    <button type="submit" class="btn btn-sm btn-danger">删除</button>
+			    </form>
+		    </td>
                 </tr>
                 {% endfor %}
             </tbody>

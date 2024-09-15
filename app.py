@@ -170,7 +170,7 @@ def add_student():
     if request.method == 'POST':
         if form.validate_on_submit():
             if form.photo.data:
-                photo_filename = str(uuid.uuid4()) + '.' + form.photo.data.filename.split('.')[-1]
+                photo_filename = str(uuid.uuid4()) + '.jpg'
                 image = Image.open(form.photo.data)
                 image.thumbnail((800, 600))
                 image.save(os.path.join(app.config['UPLOAD_FOLDER'], photo_filename))
@@ -179,6 +179,7 @@ def add_student():
             student = Student(
                 name=form.name.data,
                 class_name=current_user.username,
+                gender = form.gender.data,
                 noon_leaving=form.noon_leaving.data,
                 night_leaving=form.night_leaving.data,
                 day_student=form.day_student.data,

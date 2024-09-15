@@ -11,7 +11,7 @@ class StudentForm(FlaskForm):
     day_student = BooleanField('校内走读')
     boarding_student = BooleanField('住校')
     remarks = TextAreaField('备注', validators=[Length(max=255)])
-    photo = FileField('上传照片', validators=[DataRequired(), FileAllowed(['jpg'], '只能上传jpg图片文件')])
+    photo = FileField('上传照片', validators=[DataRequired(), FileAllowed(['jpg', 'jpeg'], '只能上传jpg或jpeg图片文件')])
     submit = SubmitField('提交')
 
 class LoginForm(FlaskForm):
