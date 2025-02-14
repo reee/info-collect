@@ -1,6 +1,6 @@
 from collections import defaultdict
 import re
-from flask import Flask, current_app, render_template, redirect, send_file, send_from_directory, url_for, request, flash
+from flask import Flask, current_app, render_template, redirect, send_file, send_from_directory, url_for, request, flash, session
 from flask_login import LoginManager, login_user, logout_user, current_user
 from flask_bootstrap import Bootstrap5
 from flask_migrate import Migrate
@@ -71,13 +71,16 @@ def login():
         username = form.username.data
         password = form.password.data
         if username == admin_config['username'] and password == admin_config['password']:
-            # Admin login
+            session['is_admin'] = True
+            session['logged_in'] = True  # 添加通用登录状态标记
             return redirect(url_for('admin_dashboard'))
         else:
             user = User.query.filter_by(username=username).first()
             if user and user.check_password(password):
-            # 普通用户登录
+                # 普通用户登录
                 login_user(user)
+                session['logged_in'] = True
+                session['is_admin'] = False
                 return redirect(url_for('user_dashboard'))
             else:
                 flash('用户名或密码错误', 'danger')
@@ -85,37 +88,16 @@ def login():
 
 @app.route('/logout')
 def logout():
-    logout_user()
+    session.clear()  # 清除所有session数据
+    logout_user()    # 清除Flask-Login的用户会话
     return redirect(url_for('login'))
 
-@app.route('/admin', methods=['GET', 'POST'])
+@app.route('/admin')
 def admin_dashboard():
-    form = ImportForm()
-    if form.validate_on_submit():
-        file = form.file.data
-        clear_users = form.clear_users.data
-        if file.filename.endswith('.xlsx'):
-            try:
-                if clear_users:
-                    # 删除所有现有用户
-                    User.query.delete()
-                    db.session.commit()
-                    flash('所有现有用户已被删除', 'info')
-
-                df = pd.read_excel(file)
-                for _, row in df.iterrows():
-                    username = row['用户名']
-                    password = row['密码']
-                    user = User(username=username)
-                    user.set_password(password)
-                    db.session.add(user)
-                db.session.commit()
-                flash('用户信息导入成功', 'success')
-            except Exception as e:
-                db.session.rollback()
-                flash(f'导入失败：{str(e)}', 'danger')
-        else:
-            flash('仅支持导入.xlsx文件', 'danger')
+    # 检查是否是管理员
+    if not session.get('is_admin', False):
+        flash('请以管理员身份登录', 'warning')
+        return redirect(url_for('login'))
 
     # 获取所有用户并分组
     users = User.query.all()
@@ -148,10 +130,75 @@ def admin_dashboard():
                     grouped_users['其他初中'].append(user)
             else:
                 grouped_users['其他'].append(user)
-    else:
-        flash('当前没有用户数据，请先导入用户。', 'info')
 
-    return render_template('admin_dashboard.html', form=form, grouped_users=grouped_users)
+    return render_template('admin_dashboard.html', grouped_users=grouped_users)
+
+@app.route('/import_users', methods=['GET', 'POST'])
+def import_users():
+    # 检查是否是管理员
+    if not session.get('is_admin', False):
+        flash('请以管理员身份登录', 'warning')
+        return redirect(url_for('login'))
+
+    form = ImportForm()
+    if form.validate_on_submit():
+        file = form.file.data
+        clear_users = form.clear_users.data
+        if file.filename.endswith('.xlsx'):
+            try:
+                if clear_users:
+                    # 删除所有现有用户
+                    User.query.delete()
+                    db.session.commit()
+                    flash('所有现有用户已被删除', 'info')
+
+                df = pd.read_excel(file)
+                for _, row in df.iterrows():
+                    username = row['用户名']
+                    password = row['密码']
+                    user = User(username=username)
+                    user.set_password(password)
+                    db.session.add(user)
+                db.session.commit()
+                flash('用户信息导入成功', 'success')
+                return redirect(url_for('admin_dashboard'))
+            except Exception as e:
+                db.session.rollback()
+                flash(f'导入失败：{str(e)}', 'danger')
+        else:
+            flash('仅支持导入.xlsx文件', 'danger')
+
+    return render_template('import_users.html', form=form)
+
+@app.route('/initialize_system')
+def initialize_system():
+    # 检查是否是管理员
+    if not session.get('is_admin', False):
+        flash('请以管理员身份登录', 'warning')
+        return redirect(url_for('login'))
+
+    try:
+        # 删除所有学生记录
+        Student.query.delete()
+        db.session.commit()
+
+        # 删除uploads目录下的所有文件
+        upload_dir = app.config['UPLOAD_FOLDER']
+        for filename in os.listdir(upload_dir):
+            if filename != '.gitkeep':  # 保留.gitkeep文件
+                file_path = os.path.join(upload_dir, filename)
+                try:
+                    if os.path.isfile(file_path):
+                        os.unlink(file_path)
+                except Exception as e:
+                    print(f'Error deleting {file_path}: {e}')
+
+        flash('系统已成功初始化：所有学生信息和照片已被清除', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'初始化失败：{str(e)}', 'danger')
+
+    return redirect(url_for('admin_dashboard'))
 
 @app.route('/user')
 def user_dashboard():
@@ -169,17 +216,50 @@ def add_student():
     form = StudentForm()
     if request.method == 'POST':
         if form.validate_on_submit():
+            # 检查同班是否存在同名学生
+            existing_student = Student.query.filter_by(
+                name=form.name.data,
+                class_name=current_user.username
+            ).first()
+            
+            if existing_student:
+                flash('当前本班已存在同名学生。若需要修改相关信息，请先删除对应学生后再添加。若确实存在同名情况，可在名字后加上数字或其他后缀后再添加。', 'warning')
+                return redirect(url_for('user_dashboard'))
+
+            photo_filename = None
             if form.photo.data:
-                photo_filename = str(uuid.uuid4()) + '.jpg'
-                image = Image.open(form.photo.data)
-                image.thumbnail((800, 600))
-                image.save(os.path.join(app.config['UPLOAD_FOLDER'], photo_filename))
+                try:
+                    # 读取图片并进行处理
+                    image = Image.open(form.photo.data)
+                    
+                    # 获取旋转角度并应用旋转
+                    rotation = request.form.get('rotation', '0')
+                    if rotation and rotation != '0':
+                        # 转换为整数并取负值（因为前端顺时针旋转，而PIL逆时针旋转）
+                        rotation_angle = -int(rotation)
+                        image = image.rotate(rotation_angle, expand=True)
+                    
+                    # 生成唯一文件名
+                    photo_filename = str(uuid.uuid4()) + '.jpg'
+                    
+                    # 调整图片大小并保持纵横比
+                    max_size = (800, 800)
+                    image.thumbnail(max_size, Image.Resampling.LANCZOS)
+                    
+                    # 保存处理后的图片
+                    image_path = os.path.join(app.config['UPLOAD_FOLDER'], photo_filename)
+                    image = image.convert('RGB')  # 确保保存为JPG格式
+                    image.save(image_path, 'JPEG', quality=85)
+                except Exception as e:
+                    current_app.logger.error(f"Image processing error: {str(e)}")
+                    flash('图片处理失败，请确保上传了有效的图片文件', 'danger')
+                    return redirect(url_for('add_student'))
 
             # 创建新的学生对象
             student = Student(
                 name=form.name.data,
                 class_name=current_user.username,
-                gender = form.gender.data,
+                gender=form.gender.data,
                 noon_leaving=form.noon_leaving.data,
                 night_leaving=form.night_leaving.data,
                 day_student=form.day_student.data,

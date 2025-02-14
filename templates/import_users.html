@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from 'bootstrap5/form.html' import render_form %}
+{% block content %}
+
+<div class="container">
+    <h2 class="mt-5 mb-4">导入用户信息</h2>
+
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">上传用户数据</h5>
+            <div class="alert alert-info">
+                <h6>文件格式说明：</h6>
+                <ul class="mb-0">
+                    <li>请上传Excel文件（.xlsx格式）</li>
+                    <li>文件应包含两列：用户名，密码</li>
+                    <li>用户名命名规则：
+                        <ul>
+                            <li>创新基地班：以GZJD或CZJD开头</li>
+                            <li>普通班级：以GZ（高中）或CZ（初中）开头</li>
+                            <li>后跟6位班级代码（四位年级代码+两位班级代码）</li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+            {{ render_form(form) }}
+        </div>
+    </div>
+</div>
+
+{% endblock %}

@@ -9,18 +9,19 @@
     <h4>温馨提示：</h4>
     <ol>
         <li>上传照片的要求为：<strong>当天拍摄的（可用自己手机拍摄）无任何PS或者美颜的大头照，要求露出额头及耳朵，白色或浅色背景，无逆光。</strong></li>
-        <li>信息填写不准确的请删除后重新新增即可。</li>
+        <li>照片格式仅允许：<strong>jpg或jpeg</strong>。较新的手机请<strong>关闭</strong>相机设置中的<strong>高效图片存储</strong>或类似选项(该选项会生成heif格式的图片)。</li>
+        <li>信息填写有误的请<strong>先删除后再重新新增</strong>。</li>
     </ol>
     <hr>
     <h3>已录入学生名单</h3>
-    <div class="table-responsive-sm">
-        <table class="table table-striped">
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
             <thead>
                 <tr>
                     <th>序号</th>
                     <th>姓名</th>
                     <th>性别</th>
-                    <th>照片</th>
+                    <th style="min-width: 120px;">照片</th>
                     <th>班级</th>
                     <th>班级内部编号</th>
                     <th>中午离校</th>
@@ -41,8 +42,8 @@
                         {% if student.photo_filename %}
                         <img src="{{ url_for('uploaded_file', filename=student.photo_filename) }}"
                              alt="{{ student.name }}的照片"
-                             class="img-thumbnail"
-                             style="width: 120px; height: 120px; object-fit: cover; cursor: pointer;"
+                             class="img-fluid rounded"
+                             style="width: 100%; max-width: 120px; height: auto; aspect-ratio: 1; object-fit: cover; cursor: pointer;"
                              data-bs-toggle="modal"
                              data-bs-target="#imageModal"
                              data-bs-src="{{ url_for('uploaded_file', filename=student.photo_filename) }}"

@@ -1,40 +1,48 @@
 {% extends "base.html" %}
-{% from 'bootstrap5/form.html' import render_form %}
 {% block content %}
 
 <div class="container">
-    <h2 class="mt-5 mb-4">管理员控制面板</h2>
 
-    <div class="card mt-4">
-        <div class="card-body">
-            <h5 class="card-title">导入用户信息</h5>
-            {{ render_form(form) }}
-        </div>
-    </div>
-
-    <h3 class="mt-5">班级列表</h3>
+    <h2 class="mt-5 mb-4">班级列表</h2>
 
     {% if grouped_users %}
-        {% for group, users in grouped_users.items() %}
-            <h4 class="mt-4">{{ group }}</h4>
-            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
-                {% for user in users %}
-                    <div class="col">
-                        <div class="card h-100">
-                            <div class="card-body">
-                                <h5 class="card-title">{{ user.username }}</h5>
-                                <p>已录入学生人数：{{ user.student_count }}</p>
-                                <a href="{{ url_for('export_class_students', username=user.username, boarding_or_leaving='True') }}" class="btn btn-sm btn-primary my-1">导出住校生</a>
-                                <a href="{{ url_for('export_class_students', username=user.username, boarding_or_leaving='False') }}" class="btn btn-sm btn-secondary my-1">导出非住校生</a>
-                                <a href="{{ url_for('export_class_students', username=user.username, boarding_or_leaving='leaving') }}" class="btn btn-sm btn-info my-1">导出中午晚上离校生</a>
-                            </div>
+        <div class="accordion" id="classGroups">
+            {% for group, users in grouped_users.items() %}
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ loop.index }}" aria-expanded="{{ 'true' if loop.first else 'false' }}" aria-controls="collapse{{ loop.index }}">
+                        {{ group }} ({{ users|length }}个班级)
+                    </button>
+                </h2>
+                <div id="collapse{{ loop.index }}" class="accordion-collapse collapse {% if loop.first %}show{% endif %}" data-bs-parent="#classGroups">
+                    <div class="accordion-body">
+                        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
+                            {% for user in users %}
+                                <div class="col">
+                                    <div class="card h-100 border-light">
+                                        <div class="card-body">
+                                            <h6 class="card-title">{{ user.username }}</h6>
+                                            <p class="card-text small mb-2">已录入：{{ user.student_count }}人</p>
+                                            <div class="btn-group btn-group-sm">
+                                                <a href="{{ url_for('export_class_students', username=user.username, boarding_or_leaving='True') }}" class="btn btn-outline-primary">住校生</a>
+                                                <a href="{{ url_for('export_class_students', username=user.username, boarding_or_leaving='False') }}" class="btn btn-outline-secondary">非住校生</a>
+                                                <a href="{{ url_for('export_class_students', username=user.username, boarding_or_leaving='leaving') }}" class="btn btn-outline-info">离校生</a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
                         </div>
                     </div>
-                {% endfor %}
+                </div>
             </div>
-        {% endfor %}
+            {% endfor %}
+        </div>
     {% else %}
-        <p>当前没有用户数据，请先导入用户。</p>
+        <div class="alert alert-info">
+            <h4 class="alert-heading">暂无数据</h4>
+            <p class="mb-0">当前没有用户数据，请先<a href="{{ url_for('import_users') }}" class="alert-link">导入用户</a>。</p>
+        </div>
     {% endif %}
 </div>
 

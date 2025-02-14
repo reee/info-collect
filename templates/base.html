@@ -15,14 +15,20 @@
         </button>
         <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
           <div class="navbar-nav">
-            <a class="nav-link active" aria-current="page" href="/">主页</a>
-            {% if current_user.is_anonymous %}
-            <a class="nav-item nav-link" href="/">登录</a>
+            <a class="nav-link" href="/">主页</a>
+            {% if session.logged_in %}
+                {% if session.is_admin %}
+                <a class="nav-link" href="/admin">班级列表</a>
+                <a class="nav-link" href="/import_users">导入用户</a>
+                <a class="nav-link" href="#" onclick="confirmInitialize()">初始化系统</a>
+                {% else %}
+                <a class="nav-link" href="/user">班级管理面板</a>
+                {% endif %}
+                <a class="nav-link" href="/logout">注销</a>
             {% else %}
-            <a class="nav-item nav-link" href="/user">班级管理面板</a>
-            <a class="nav-item nav-link" href="/logout">注销</a>
+                <a class="nav-link" href="/">登录</a>
             {% endif %}
-          </div>
+        </div>
         </div>
       </div>
     </nav>
@@ -51,6 +57,13 @@
   
   {% block scripts %}
     {{ bootstrap.load_js() }}
+    <script>
+      function confirmInitialize() {
+        if (confirm('警告：此操作将清除所有已导入的学生信息和照片！确定要继续吗？')) {
+          window.location.href = '/initialize_system';
+        }
+      }
+    </script>
   {% endblock %}
 
 
